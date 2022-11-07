@@ -8,6 +8,7 @@
 constexpr auto canvasWidth = 40;
 constexpr auto canvasHeight = 40;
 constexpr auto squareSize = 16;
+constexpr auto framerateLimit = 10;
 
 enum Direction
 {
@@ -23,13 +24,22 @@ int main(int argc, char** argv)
     srand(time(NULL));
 
     sf::RenderWindow window(sf::VideoMode(static_cast<unsigned int>(canvasWidth * squareSize), static_cast<unsigned int>(canvasHeight * squareSize)), "Snake - Score: 0", sf::Style::Close | sf::Style::Titlebar);
-    window.setFramerateLimit(10u);
+    //window.setFramerateLimit(10u);
 
-    std::vector<sf::RectangleShape> snake{};
+    std::vector<sf::RectangleShape> snake;
     Direction direction = RIGHT;
     sf::Vector2f snakePos(2.0F, 4.0F);
-    sf::RectangleShape apple{};
+    sf::RectangleShape apple;
     int score = 0;
+    sf::Clock timer;
+
+
+start:
+    direction = RIGHT;
+    snake.clear();
+    score = 0;
+    snakePos.x = 2.0F;
+    snakePos.y = 4.0F;
 
     apple.setFillColor(sf::Color::Red);
     apple.setSize(sf::Vector2f(squareSize, squareSize));
@@ -51,6 +61,9 @@ int main(int argc, char** argv)
             switch (event.type)
             {
             case sf::Event::Closed:
+#ifdef _DEBUG
+                printf("Window closed\n");
+#endif
                 window.close();
                 break;
             default:
@@ -69,61 +82,72 @@ int main(int argc, char** argv)
             direction = RIGHT;
 
         // Change the snakes position according to the current direction
-        if (direction == UP)
-            snakePos.y--;
-        if (direction == DOWN)
-            snakePos.y++;
-        if (direction == LEFT)
-            snakePos.x--;
-        if (direction == RIGHT)
-            snakePos.x++;
-
-        // Add a new block to the end of the snake
-        sf::RectangleShape newBlock{};
-        newBlock.setFillColor(sf::Color::Green);
-        newBlock.setOutlineColor(sf::Color(0x00AA00FF));
-        newBlock.setSize(sf::Vector2f(squareSize, squareSize));
-        newBlock.setPosition(snakePos * (float)squareSize);
-        snake.emplace_back(newBlock);
-
-        // Check if the snake has bumped into itself
-        for (size_t i = 0; i < snake.size() - 1U; i++)
+        if (timer.getElapsedTime().asMilliseconds() >= 1000 / framerateLimit)
         {
-            if (snake.at(i).getGlobalBounds().intersects(snake.at(snake.size() - 1U).getGlobalBounds()))
+            timer.restart();
+
+            if (direction == UP)
+                snakePos.y--;
+            if (direction == DOWN)
+                snakePos.y++;
+            if (direction == LEFT)
+                snakePos.x--;
+            if (direction == RIGHT)
+                snakePos.x++;
+
+            // Add a new block to the end of the snake
+            sf::RectangleShape newBlock{};
+            newBlock.setFillColor(sf::Color::Green);
+            newBlock.setOutlineColor(sf::Color(0x00AA00FF));
+            newBlock.setSize(sf::Vector2f(squareSize, squareSize));
+            newBlock.setPosition(snakePos * (float)squareSize);
+            snake.emplace_back(newBlock);
+
+            // Check if the snake has bumped into itself
+            for (size_t i = 0; i < snake.size() - 1U; i++)
             {
-                window.close();
-            }
-        }
-
-        // Check if the snake has crossed the window border
-        if (!snake.at(snake.size() - 1U).getGlobalBounds().intersects(sf::FloatRect(0, 0, static_cast<unsigned int>(canvasWidth * squareSize), static_cast<unsigned int>(canvasHeight * squareSize))))
-        {
-            window.close();
-        }
-
-        // Check if the snake has intersected with the apple, if it has then set the apple to a
-        // new random position and increment the score, otherwise remove the end block on the snake
-        if (snake.at(snake.size() - 1U).getGlobalBounds().intersects(apple.getGlobalBounds()))
-        {
-        check:
-            apple.setPosition((rand() % 40) * squareSize, (rand() % 40) * squareSize);
-            for (auto& block : snake)
-            {
-                if (block.getGlobalBounds().intersects(apple.getGlobalBounds()))
+                if (snake.at(i).getGlobalBounds().intersects(snake.at(snake.size() - 1U).getGlobalBounds()))
                 {
-                    goto check; // Yeah I'm probably going to get yelled at for doing this...
+#ifdef _DEBUG
+                    printf("Snake collided with itself\n");
+#endif
+                    goto start;
                 }
             }
 
-            score++;
-        }
-        else
-        {
-            snake.erase(snake.begin());
-        }
+            // Check if the snake has crossed the window border
+            if (!snake.at(snake.size() - 1U).getGlobalBounds().intersects(sf::FloatRect(0, 0, static_cast<unsigned int>(canvasWidth * squareSize), static_cast<unsigned int>(canvasHeight * squareSize))))
+            {
+#ifdef _DEBUG
+                printf("Snake collided with border\n");
+#endif
+                goto start;
+            }
 
-        // Set the window title to correctly display the score
-        window.setTitle("Snake - Score: " + std::to_string(score));
+            // Check if the snake has intersected with the apple, if it has then set the apple to a
+            // new random position and increment the score, otherwise remove the end block on the snake
+            if (snake.at(snake.size() - 1U).getGlobalBounds().intersects(apple.getGlobalBounds()))
+            {
+            check:
+                apple.setPosition((rand() % 40) * squareSize, (rand() % 40) * squareSize);
+                for (auto& block : snake)
+                {
+                    if (block.getGlobalBounds().intersects(apple.getGlobalBounds()))
+                    {
+                        goto check; // Yeah I'm probably going to get yelled at for doing this...
+                    }
+                }
+
+                score++;
+            }
+            else
+            {
+                snake.erase(snake.begin());
+            }
+
+            // Set the window title to correctly display the score
+            window.setTitle("Snake - Score: " + std::to_string(score));
+        }
 
         // Draw all the sprites
         window.clear(sf::Color::Black);
@@ -134,4 +158,6 @@ int main(int argc, char** argv)
         window.draw(apple);
         window.display();
     }
+
+    return 0;
 }
